@@ -5,19 +5,38 @@ import { GiPadlock } from 'react-icons/gi';
 import { useForm } from 'react-hook-form';
 import { registerSchema, RegisterSchema } from '@/lib/schemas/registerSchema';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { registerUser } from '@/app/actions/authActions';
+import { useState } from 'react';
 
 export default function RegisterForm() {
+  const [statusOk, setStatusOk] = useState(false);
   const {
     register,
     handleSubmit,
-    formState: { errors, isValid },
+    setError,
+    formState: { errors, isValid, isSubmitting },
   } = useForm<RegisterSchema>({
-    resolver: zodResolver(registerSchema),
+    //resolver: zodResolver(registerSchema),
     mode: 'onTouched',
   });
 
-  const onSubmit = (data: RegisterSchema) => {
-    console.log(data);
+  const onSubmit = async (data: RegisterSchema) => {
+    const result = await registerUser(data);
+
+    if (result.status === 'success') {
+      console.log('User registered successfully');
+      setStatusOk(true);
+    } else {
+      setStatusOk(false);
+      if (Array.isArray(result.error)) {
+        result.error.forEach((e) => {
+          const fieldName = e.path.join('.') as 'email' | 'name' | 'password';
+          setError(fieldName, { message: e.message });
+        });
+      } else {
+        setError('root.serverError', { message: result.error });
+      }
+    }
   };
 
   return (
@@ -56,7 +75,18 @@ export default function RegisterForm() {
               isInvalid={!!errors.password}
               errorMessage={errors.password?.message}
             />
+            {errors.root?.serverError && (
+              <p className="text-danger text-sm">
+                {errors.root.serverError.message}
+              </p>
+            )}
+            {statusOk && (
+              <p className="text-success text-sm">
+                User registered successfully
+              </p>
+            )}
             <Button
+              isLoading={isSubmitting}
               isDisabled={!isValid}
               fullWidth
               color="secondary"
